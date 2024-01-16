@@ -1,11 +1,10 @@
 import * as path from 'path';
-import { format } from 'util';
+import { format, inspect } from 'util';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as chalk from 'chalk';
 import * as chokidar from 'chokidar';
 import * as fs from 'fs-extra';
 import * as promptly from 'promptly';
-import * as uuid from 'uuid';
 import { DeploymentMethod } from './api';
 import { SdkProvider } from './api/aws-auth';
 import { Bootstrapper, BootstrapEnvironmentOptions } from './api/bootstrap';
@@ -15,7 +14,6 @@ import { Deployments } from './api/deployments';
 import { HotswapMode } from './api/hotswap/common';
 import { findCloudWatchLogGroups } from './api/logs/find-cloudwatch-logs';
 import { CloudWatchLogEventMonitor } from './api/logs/logs-monitor';
-import { createDiffChangeSet } from './api/util/cloudformation';
 import { StackActivityProgress } from './api/util/cloudformation/stack-activity-monitor';
 import { generateCdkApp, generateStack, readFromPath, readFromStack, setEnvironment, validateSourceOptions } from './commands/migrate';
 import { printSecurityDiff, printStackDiff, RequireApproval } from './diff';
@@ -28,7 +26,14 @@ import { validateSnsTopicArn } from './util/validate-notification-arn';
 import { Concurrency, WorkGraph } from './util/work-graph';
 import { WorkGraphBuilder } from './util/work-graph-builder';
 import { AssetBuildNode, AssetPublishNode, StackNode } from './util/work-graph-types';
+import { StackData, listWorkflow } from './workflows';
 import { environmentsFromDescriptors, globEnvironmentsFromStacks, looksLikeGlob } from '../lib/api/cxapp/environments';
+
+export type Long = { id: string; name: string; environment: cxapi.Environment; dependencies?: { [key:string]: string }; };
+export type Result = {
+  stackName: string;
+  dependencies: Result[];
+}
 
 export interface CdkToolkitProps {
 
@@ -123,8 +128,6 @@ export class CdkToolkit {
     const quiet = options.quiet || false;
 
     let diffs = 0;
-    const parameterMap = buildParameterMap(options.parameters);
-
     if (options.templatePath !== undefined) {
       // Compare single stack against fixed template
       if (stacks.stackCount !== 1) {
@@ -134,21 +137,10 @@ export class CdkToolkit {
       if (!await fs.pathExists(options.templatePath)) {
         throw new Error(`There is no file at ${options.templatePath}`);
       }
-
-      const changeSet = options.changeSet ? await createDiffChangeSet({
-        stack: stacks.firstStack,
-        uuid: uuid.v4(),
-        willExecute: false,
-        deployments: this.props.deployments,
-        sdkProvider: this.props.sdkProvider,
-        parameters: Object.assign({}, parameterMap['*'], parameterMap[stacks.firstStack.stackName]),
-        stream,
-      }) : undefined;
-
       const template = deserializeStructure(await fs.readFile(options.templatePath, { encoding: 'UTF-8' }));
       diffs = options.securityOnly
-        ? numberFromBool(printSecurityDiff(template, stacks.firstStack, RequireApproval.Broadening, changeSet))
-        : printStackDiff(template, stacks.firstStack, strict, contextLines, quiet, changeSet, stream);
+        ? numberFromBool(printSecurityDiff(template, stacks.firstStack, RequireApproval.Broadening))
+        : printStackDiff(template, stacks.firstStack, strict, contextLines, quiet, stream);
     } else {
       // Compare N stacks against deployed templates
       for (const stack of stacks.stackArtifacts) {
@@ -162,20 +154,10 @@ export class CdkToolkit {
         const currentTemplate = templateWithNames.deployedTemplate;
         const nestedStackCount = templateWithNames.nestedStackCount;
 
-        const changeSet = options.changeSet ? await createDiffChangeSet({
-          stack,
-          uuid: uuid.v4(),
-          deployments: this.props.deployments,
-          willExecute: false,
-          sdkProvider: this.props.sdkProvider,
-          parameters: Object.assign({}, parameterMap['*'], parameterMap[stacks.firstStack.stackName]),
-          stream,
-        }) : undefined;
-
         const stackCount =
         options.securityOnly
-          ? (numberFromBool(printSecurityDiff(currentTemplate, stack, RequireApproval.Broadening, changeSet)) > 0 ? 1 : 0)
-          : (printStackDiff(currentTemplate, stack, strict, contextLines, quiet, changeSet, stream) > 0 ? 1 : 0);
+          ? (numberFromBool(printSecurityDiff(currentTemplate, stack, RequireApproval.Broadening)) > 0 ? 1 : 0)
+          : (printStackDiff(currentTemplate, stack, strict, contextLines, quiet, stream) > 0 ? 1 : 0);
 
         diffs += stackCount + nestedStackCount;
       }
@@ -206,7 +188,20 @@ export class CdkToolkit {
 
     const requireApproval = options.requireApproval ?? RequireApproval.Broadening;
 
-    const parameterMap = buildParameterMap(options.parameters);
+    const parameterMap: { [name: string]: { [name: string]: string | undefined } } = { '*': {} };
+    for (const key in options.parameters) {
+      if (options.parameters.hasOwnProperty(key)) {
+        const [stack, parameter] = key.split(':', 2);
+        if (!parameter) {
+          parameterMap['*'][stack] = options.parameters[key];
+        } else {
+          if (!parameterMap[stack]) {
+            parameterMap[stack] = {};
+          }
+          parameterMap[stack][parameter] = options.parameters[key];
+        }
+      }
+    }
 
     if (options.hotswap !== HotswapMode.FULL_DEPLOYMENT) {
       warning('⚠️ The --hotswap and --hotswap-fallback flags deliberately introduce CloudFormation drift to speed up deployments');
@@ -595,29 +590,131 @@ export class CdkToolkit {
     }
   }
 
-  public async list(selectors: string[], options: { long?: boolean, json?: boolean } = { }): Promise<number> {
-    const stacks = await this.selectStacksForList(selectors);
+  // displayStackDependencies(stacks: StackData[]): { [key: string]: Long[] } {
+  //   const result: { [key:string]: string } = {};
+
+  //   for (const index of stacks) {
+  //     if (index.dependencies && index.dependencies.length > 0) {
+
+  //     }
+
+  //     const stackName = index.stack.manifest.displayName ?? index.stack.id;
+  //     result.stackName;
+  //   }
+  // }
+
+  public async list(selectors: string[], options: { long?: boolean, json?: boolean, showDeps?: boolean } = { }): Promise<number> {
+    // TODO const stacks = await this.selectStacksForList(selectors);
+
+    // const stacks = await this.describeStacksForList(selectors);
+
+    const stacks = await listWorkflow(this, {
+      selectedStacks: selectors,
+    });
+
+    data(`Orgininal: ${inspect(stacks, {
+      depth: 10,
+    })}\n\n\n\n]`);
+
+    const depStructure = this.createStackDependencyStructure(stacks);
+
+    data(`Dependency Structure: \n${inspect(depStructure, {
+      depth: 10,
+    })}}\n\n\n\n`);
+
+    if (options.long && options.showDeps) {
+      throw new Error('You can only specify either list or show-deps flag while listing stacks');
+    }
 
     // if we are in "long" mode, emit the array as-is (JSON/YAML)
     if (options.long) {
-      const long = [];
-      for (const stack of stacks.stackArtifacts) {
+      const long: Long[] = [];
+
+      stacks.forEach((index) => {
+
         long.push({
-          id: stack.hierarchicalId,
-          name: stack.stackName,
-          environment: stack.environment,
+          id: index.stack.hierarchicalId,
+          name: index.stack.stackName,
+          environment: index.stack.environment,
         });
-      }
+      });
+
       data(serializeStructure(long, options.json ?? false));
       return 0;
     }
 
-    // just print stack IDs
-    for (const stack of stacks.stackArtifacts) {
-      data(stack.hierarchicalId);
+    if (options.showDeps) {
+      depStructure.forEach(instance => {
+        const stackName = instance.stackName;
+        data(stackName);
+
+        const depOfStack = instance.dependencies;
+        data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}\n`);
+      });
+
+      // stacks.forEach((item) => {
+      //   const stackName = item.stack.hierarchicalId;
+      //   data(stackName);
+
+      //   // TODO Improve this to key value pairs
+      //   const depOfStack = depStructure.filter((dep) => dep.stackName === stackName);
+
+      //   // const dependencies = depOfStack.filter(name => !name.includes('.assets'));
+      //   // dependencies.forEach(depName => data(`|___ ${depName}`));
+
+      //   data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}`);
+      // });
+    } else {
+      // just print stack IDs
+      stacks.forEach((item) => {
+        data(item.stack.hierarchicalId);
+      });
+
     }
 
     return 0; // exit-code
+  }
+
+  /**
+   * A
+   *
+   * B
+   * --- A
+   *
+   * C
+   * --- A
+   * --- B
+   * ------ A
+   *
+   */
+  // TODO: Improve structure here for better access
+  createStackDependencyStructure(items: StackData[]): Result[] {
+    const allResults: Result[] = [];
+    for (const item of items) {
+
+      const stackName = item.stack.manifest.displayName ?? item.stack.id;
+      const result: Result = {
+        stackName: stackName,
+        dependencies: [],
+      };
+
+      for (const dep of item.dependencies) {
+
+        let dependenciesOfDependency: Result[] = [];
+        if (dep.dependencies) {
+          dependenciesOfDependency = this.createStackDependencyStructure(dep.dependencies);
+        }
+
+        result.dependencies.push({
+          stackName: dep.stack.manifest.displayName ?? dep.stack.id,
+          dependencies: dependenciesOfDependency,
+        });
+      }
+
+      allResults.push(result);
+    }
+
+    return allResults;
   }
 
   /**
@@ -733,13 +830,34 @@ export class CdkToolkit {
   }
 
   private async selectStacksForList(patterns: string[]) {
-    const assembly = await this.assembly();
+    const assembly = await this.assembly(); // EXPLORE: This has all the cloud artifacts, so should also have nested ones?
     const stacks = await assembly.selectStacks({ patterns }, { defaultBehavior: DefaultSelection.AllStacks });
 
     // No validation
 
     return stacks;
   }
+
+  // private async describeStacksForList(patterns: string[]) {
+  //   const assembly = await this.assembly(); // EXPLORE: This has all the cloud artifacts, so should also have nested ones?
+
+  //   // const stacks = await assembly.selectStacks({ patterns }, { defaultBehavior: DefaultSelection.AllStacks });
+
+  //   // TODO this would fail if there are multiple stacks for which we want to view nested hierarchy due to how we are selecting upstream stacks with DefaultSelection.AllStacks
+  //   const stacks = await assembly.selectStacks({ patterns }, {
+  //     // TODO improve: extend: exclusively ? ExtendedStackSelection.None : ExtendedStackSelection.Upstream,
+  //     extend: ExtendedStackSelection.Upstream,
+  //     // TODO previous: defaultBehavior: DefaultSelection.OnlySingle,
+  //     defaultBehavior: DefaultSelection.AllStacks,
+  //   });
+
+  //   this.validateStacksSelected(stacks, patterns);
+  //   this.validateStacks(stacks);
+
+  //   // No validation
+
+  //   return stacks;
+  // }
 
   private async selectStacksForDeploy(selector: StackSelector, exclusively?: boolean, cacheCloudAssembly?: boolean): Promise<StackCollection> {
     const assembly = await this.assembly(cacheCloudAssembly);
@@ -788,7 +906,7 @@ export class CdkToolkit {
   /**
    * Validate the stacks for errors and warnings according to the CLI's current settings
    */
-  private validateStacks(stacks: StackCollection) {
+  public validateStacks(stacks: StackCollection) {
     stacks.processMetadataMessages({
       ignoreErrors: this.props.ignoreErrors,
       strict: this.props.strict,
@@ -799,7 +917,7 @@ export class CdkToolkit {
   /**
    * Validate that if a user specified a stack name there exists at least 1 stack selected
    */
-  private validateStacksSelected(stacks: StackCollection, stackNames: string[]) {
+  public validateStacksSelected(stacks: StackCollection, stackNames: string[]) {
     if (stackNames.length != 0 && stacks.stackCount == 0) {
       throw new Error(`No stacks match the name(s) ${stackNames}`);
     }
@@ -824,7 +942,7 @@ export class CdkToolkit {
     return assembly.stackById(stacks.firstStack.id);
   }
 
-  private assembly(cacheCloudAssembly?: boolean): Promise<CloudAssembly> {
+  public assembly(cacheCloudAssembly?: boolean): Promise<CloudAssembly> {
     return this.props.cloudExecutable.synthesize(cacheCloudAssembly);
   }
 
@@ -941,19 +1059,6 @@ export interface DiffOptions {
   * @default false
   */
   quiet?: boolean;
-
-  /**
-   * Additional parameters for CloudFormation at diff time, used to create a change set
-   * @default {}
-   */
-  parameters?: { [name: string]: string | undefined };
-
-  /**
-   * Whether or not to create, analyze, and subsequently delete a changeset
-   *
-   * @default true
-   */
-  changeSet?: boolean;
 }
 
 interface CfnDeployOptions {
@@ -1310,25 +1415,4 @@ function roundPercentage(num: number): number {
  */
 function millisecondsToSeconds(num: number): number {
   return num / 1000;
-}
-
-function buildParameterMap(parameters: {
-  [name: string]: string | undefined;
-} | undefined): { [name: string]: { [name: string]: string | undefined } } {
-  const parameterMap: { [name: string]: { [name: string]: string | undefined } } = { '*': {} };
-  for (const key in parameters) {
-    if (parameters.hasOwnProperty(key)) {
-      const [stack, parameter] = key.split(':', 2);
-      if (!parameter) {
-        parameterMap['*'][stack] = parameters[key];
-      } else {
-        if (!parameterMap[stack]) {
-          parameterMap[stack] = {};
-        }
-        parameterMap[stack][parameter] = parameters[key];
-      }
-    }
-  }
-
-  return parameterMap;
 }
