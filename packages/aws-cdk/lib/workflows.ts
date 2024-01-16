@@ -2,7 +2,6 @@
 import { CloudFormationStackArtifact } from '@aws-cdk/cx-api';
 import { DefaultSelection, ExtendedStackSelection, StackCollection } from './api/cxapp/cloud-assembly';
 import { CdkToolkit } from './cdk-toolkit';
-import { print } from './logging';
 
 export interface ListWorkflowOptions {
   readonly selectedStacks: string[];
@@ -49,8 +48,6 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
 
         if (depStack.stackArtifacts[0].dependencies.length > 0 &&
           depStack.stackArtifacts[0].dependencies.filter((dep) => !(dep.manifest.displayName ?? dep.id).includes('.assets')).length > 0) {
-
-          print(`We were here for ${(depStack.stackArtifacts[0].displayName ?? depStack.stackArtifacts[0].id)}`);
 
           const stackWithDeps = calculateStackDependencies(depStack);
 
