@@ -14,12 +14,8 @@ export type StackData = {
 };
 
 export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOptions) {
-
   const assembly = await toolkit.assembly();
 
-  // const stacks = await assembly.selectStacks({ patterns }, { defaultBehavior: DefaultSelection.AllStacks });
-
-  // TODO this would fail if there are multiple stacks for which we want to view nested hierarchy due to how we are selecting upstream stacks with DefaultSelection.AllStacks
   const stacks = await assembly.selectStacks({
     patterns: options.selectedStacks,
   }, {
@@ -30,43 +26,6 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
   toolkit.validateStacksSelected(stacks, options.selectedStacks);
   toolkit.validateStacks(stacks);
 
-  // See if you need to pass more information --> allStacks.get(dependencyId)! === assembly.stackById
-  // ...assembly.stackById(dependencyId).stackArtifacts instead of dependencyId
-
-  // const added = new Map<string, Array<string>>();
-
-  // // TODO maybe we can pass data about dependency stack too?
-  // const added = new Map<CloudFormationStackArtifact, Array<string>>();
-
-  // for (const stack of stacks.stackArtifacts) {
-  //   // const stackName = stack.manifest.displayName ?? stack.id;
-  //   for (const dependencyId of stack.dependencies.map(x => x.manifest.displayName ?? x.id)) {
-
-  //     assembly.stackById(dependencyId).stackArtifacts;
-
-  //     assembly.getStac;
-
-  //     if (added.get(stack)) {
-  //       added.get(stack)?.push(dependencyId);
-  //     } else {
-  //       added.set(stack, [dependencyId]);
-  //     }
-  //   }
-  // }
-
-  /**
-   * A
-   *
-   * B
-   * --- A
-   *
-   * C
-   * --- A
-   * --- B
-   * ------ A
-   *
-   */
-
   function calculateStackDependencies(collectionOfStacks: StackCollection): StackData[] {
     const allData: StackData[] = [];
 
@@ -75,8 +34,6 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
         stack: stack,
         dependencies: [],
       };
-
-      // const stackName = stack.manifest.displayName ?? stack.id;
 
       for (const dependencyId of stack.dependencies.map(x => x.manifest.displayName ?? x.id)) {
         if (dependencyId.includes('.assets')) {
@@ -90,13 +47,6 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
           throw new Error('I hit an edge case, was not expecting this!!');
         }
 
-        // // TODO this might be an issue, check the object before concluding this is the correct approach
-        // if ((depStack.stackArtifacts[0].displayName ?? depStack.stackArtifacts[0].id) === stackName) {
-        //   continue;
-        // }
-
-        // If dependency stack also has dependencies
-        // let dependenciesOfDependency: StackData[] = [];
         if (depStack.stackArtifacts[0].dependencies.length > 0 &&
           depStack.stackArtifacts[0].dependencies.filter((dep) => !(dep.manifest.displayName ?? dep.id).includes('.assets')).length > 0) {
 

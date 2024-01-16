@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { format, inspect } from 'util';
+import { format } from 'util';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as chalk from 'chalk';
 import * as chokidar from 'chokidar';
@@ -590,37 +590,20 @@ export class CdkToolkit {
     }
   }
 
-  // displayStackDependencies(stacks: StackData[]): { [key: string]: Long[] } {
-  //   const result: { [key:string]: string } = {};
-
-  //   for (const index of stacks) {
-  //     if (index.dependencies && index.dependencies.length > 0) {
-
-  //     }
-
-  //     const stackName = index.stack.manifest.displayName ?? index.stack.id;
-  //     result.stackName;
-  //   }
-  // }
-
   public async list(selectors: string[], options: { long?: boolean, json?: boolean, showDeps?: boolean } = { }): Promise<number> {
-    // TODO const stacks = await this.selectStacksForList(selectors);
-
-    // const stacks = await this.describeStacksForList(selectors);
-
     const stacks = await listWorkflow(this, {
       selectedStacks: selectors,
     });
 
-    data(`Orgininal: ${inspect(stacks, {
-      depth: 10,
-    })}\n\n\n\n]`);
-
     const depStructure = this.createStackDependencyStructure(stacks);
 
-    data(`Dependency Structure: \n${inspect(depStructure, {
-      depth: 10,
-    })}}\n\n\n\n`);
+    // data(`Orgininal: ${inspect(stacks, {
+    //   depth: 10,
+    // })}\n\n\n\n]`);
+
+    // data(`Dependency Structure: \n${inspect(depStructure, {
+    //   depth: 10,
+    // })}}\n\n\n\n`);
 
     if (options.long && options.showDeps) {
       throw new Error('You can only specify either list or show-deps flag while listing stacks');
@@ -651,19 +634,6 @@ export class CdkToolkit {
         const depOfStack = instance.dependencies;
         data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}\n`);
       });
-
-      // stacks.forEach((item) => {
-      //   const stackName = item.stack.hierarchicalId;
-      //   data(stackName);
-
-      //   // TODO Improve this to key value pairs
-      //   const depOfStack = depStructure.filter((dep) => dep.stackName === stackName);
-
-      //   // const dependencies = depOfStack.filter(name => !name.includes('.assets'));
-      //   // dependencies.forEach(depName => data(`|___ ${depName}`));
-
-      //   data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}`);
-      // });
     } else {
       // just print stack IDs
       stacks.forEach((item) => {
@@ -675,18 +645,6 @@ export class CdkToolkit {
     return 0; // exit-code
   }
 
-  /**
-   * A
-   *
-   * B
-   * --- A
-   *
-   * C
-   * --- A
-   * --- B
-   * ------ A
-   *
-   */
   // TODO: Improve structure here for better access
   createStackDependencyStructure(items: StackData[]): Result[] {
     const allResults: Result[] = [];
@@ -837,27 +795,6 @@ export class CdkToolkit {
 
     return stacks;
   }
-
-  // private async describeStacksForList(patterns: string[]) {
-  //   const assembly = await this.assembly(); // EXPLORE: This has all the cloud artifacts, so should also have nested ones?
-
-  //   // const stacks = await assembly.selectStacks({ patterns }, { defaultBehavior: DefaultSelection.AllStacks });
-
-  //   // TODO this would fail if there are multiple stacks for which we want to view nested hierarchy due to how we are selecting upstream stacks with DefaultSelection.AllStacks
-  //   const stacks = await assembly.selectStacks({ patterns }, {
-  //     // TODO improve: extend: exclusively ? ExtendedStackSelection.None : ExtendedStackSelection.Upstream,
-  //     extend: ExtendedStackSelection.Upstream,
-  //     // TODO previous: defaultBehavior: DefaultSelection.OnlySingle,
-  //     defaultBehavior: DefaultSelection.AllStacks,
-  //   });
-
-  //   this.validateStacksSelected(stacks, patterns);
-  //   this.validateStacks(stacks);
-
-  //   // No validation
-
-  //   return stacks;
-  // }
 
   private async selectStacksForDeploy(selector: StackSelector, exclusively?: boolean, cacheCloudAssembly?: boolean): Promise<StackCollection> {
     const assembly = await this.assembly(cacheCloudAssembly);
