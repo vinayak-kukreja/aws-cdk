@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { format } from 'util';
+import { format, inspect } from 'util';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as chalk from 'chalk';
 import * as chokidar from 'chokidar';
@@ -636,12 +636,12 @@ export class CdkToolkit {
 
     const depStructure = this.createStackDependencyStructure(stacks);
 
-    // data(`Orgininal: ${inspect(stacks, {
-    //   depth: 10,
-    // })}\n\n\n\n]`);
+    data(`${inspect(stacks, {
+      depth: 5,
+    })}\n\n\n\n]`);
 
     // data(`Dependency Structure: \n${inspect(depStructure, {
-    //   depth: 10,
+    //   depth: 2,
     // })}}\n\n\n\n`);
 
     if (options.long && options.showDeps) {

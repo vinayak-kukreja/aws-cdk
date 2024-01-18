@@ -3,6 +3,9 @@ import { CloudFormationStackArtifact } from '@aws-cdk/cx-api';
 import { DefaultSelection, ExtendedStackSelection, StackCollection } from './api/cxapp/cloud-assembly';
 import { CdkToolkit } from './cdk-toolkit';
 
+/**
+ * List Workflow Options
+ */
 export interface ListWorkflowOptions {
   readonly selectedStacks: string[];
 }
@@ -12,7 +15,14 @@ export type StackData = {
   dependencies: StackData[];
 };
 
-export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOptions) {
+/**
+ * List Workflow
+ *
+ * @param toolkit a cdk toolkit instance
+ * @param options list workflow options
+ * @returns list of stack data objects
+ */
+export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOptions): Promise<StackData[]> {
   const assembly = await toolkit.assembly();
 
   const stacks = await assembly.selectStacks({
@@ -42,8 +52,7 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
         const depStack = assembly.stackById(dependencyId);
 
         if (depStack.stackCount > 1) {
-          // I believe there should just be one stack artifact when we search it with dependency id
-          throw new Error('I hit an edge case, was not expecting this!!');
+          throw new Error(`This command requires exactly one stack and we matched more than one: ${depStack.stackIds}`);
         }
 
         if (depStack.stackArtifacts[0].dependencies.length > 0 &&
