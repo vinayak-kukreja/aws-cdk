@@ -1,5 +1,5 @@
 
-import { CloudFormationStackArtifact } from '@aws-cdk/cx-api';
+import { Environment } from '@aws-cdk/cx-api';
 import { DefaultSelection, ExtendedStackSelection, StackCollection } from './api/cxapp/cloud-assembly';
 import { CdkToolkit } from './cdk-toolkit';
 
@@ -10,9 +10,11 @@ export interface ListWorkflowOptions {
   readonly selectedStacks: string[];
 }
 
-export type StackData = {
-  stack: CloudFormationStackArtifact;
-  dependencies: StackData[];
+export type StackDetails = {
+  id: string;
+  name: string;
+  environment: Environment;
+  dependencies: StackDetails[];
 };
 
 /**
@@ -22,7 +24,7 @@ export type StackData = {
  * @param options list workflow options
  * @returns list of stack data objects
  */
-export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOptions): Promise<StackData[]> {
+export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOptions): Promise<string> {
   const assembly = await toolkit.assembly();
 
   const stacks = await assembly.selectStacks({
@@ -35,12 +37,14 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
   toolkit.validateStacksSelected(stacks, options.selectedStacks);
   toolkit.validateStacks(stacks);
 
-  function calculateStackDependencies(collectionOfStacks: StackCollection): StackData[] {
-    const allData: StackData[] = [];
+  function calculateStackDependencies(collectionOfStacks: StackCollection): StackDetails[] {
+    const allData: StackDetails[] = [];
 
     for (const stack of collectionOfStacks.stackArtifacts) {
-      const data: StackData = {
-        stack: stack,
+      const data: StackDetails = {
+        id: stack.id,
+        name: stack.stackName,
+        environment: stack.environment,
         dependencies: [],
       };
 
@@ -63,7 +67,9 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
           data.dependencies?.push(...stackWithDeps);
         } else {
           data.dependencies?.push({
-            stack: depStack.stackArtifacts[0],
+            id: depStack.stackArtifacts[0].id,
+            name: depStack.stackArtifacts[0].stackName,
+            environment: depStack.stackArtifacts[0].environment,
             dependencies: [],
           });
         }
@@ -75,5 +81,9 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
     return allData;
   }
 
-  return calculateStackDependencies(stacks);
+  const result = calculateStackDependencies(stacks);
+
+  return JSON.stringify(result);
 }
+
+// Serialize to json what is returned here

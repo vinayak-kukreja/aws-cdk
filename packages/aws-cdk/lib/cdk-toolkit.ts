@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { format, inspect } from 'util';
+import { format } from 'util';
 import * as cxapi from '@aws-cdk/cx-api';
 import * as chalk from 'chalk';
 import * as chokidar from 'chokidar';
@@ -28,10 +28,10 @@ import { validateSnsTopicArn } from './util/validate-notification-arn';
 import { Concurrency, WorkGraph } from './util/work-graph';
 import { WorkGraphBuilder } from './util/work-graph-builder';
 import { AssetBuildNode, AssetPublishNode, StackNode } from './util/work-graph-types';
-import { StackData, listWorkflow } from './workflows';
+import { listWorkflow } from './workflows';
 import { environmentsFromDescriptors, globEnvironmentsFromStacks, looksLikeGlob } from '../lib/api/cxapp/environments';
 
-export type Long = { id: string; name: string; environment: cxapi.Environment; dependencies?: { [key:string]: string }; };
+export type StackDetails = { id: string; name: string; environment: cxapi.Environment; };
 export type Result = {
   stackName: string;
   dependencies: Result[];
@@ -634,84 +634,56 @@ export class CdkToolkit {
       selectedStacks: selectors,
     });
 
-    const depStructure = this.createStackDependencyStructure(stacks);
+    options;
 
-    data(`${inspect(stacks, {
-      depth: 5,
-    })}\n\n\n\n]`);
+    data(stacks);
 
-    // data(`Dependency Structure: \n${inspect(depStructure, {
-    //   depth: 2,
-    // })}}\n\n\n\n`);
+    // data(`${inspect(stacks, {
+    //   depth: 5,
+    // })}\n\n\n\n]`);
 
-    if (options.long && options.showDeps) {
-      throw new Error('You can only specify either list or show-deps flag while listing stacks');
-    }
+    // // data(`Dependency Structure: \n${inspect(depStructure, {
+    // //   depth: 2,
+    // // })}}\n\n\n\n`);
 
-    // if we are in "long" mode, emit the array as-is (JSON/YAML)
-    if (options.long) {
-      const long: Long[] = [];
+    // if (options.long && options.showDeps) {
+    //   throw new Error('You can only specify either list or show-deps flag while listing stacks');
+    // }
 
-      stacks.forEach((index) => {
+    // // if we are in "long" mode, emit the array as-is (JSON/YAML)
+    // if (options.long) {
+    //   const long: StackDetails[] = [];
 
-        long.push({
-          id: index.stack.hierarchicalId,
-          name: index.stack.stackName,
-          environment: index.stack.environment,
-        });
-      });
+    //   stacks.forEach((index) => {
 
-      data(serializeStructure(long, options.json ?? false));
-      return 0;
-    }
+    //     long.push({
+    //       id: index.stack.hierarchicalId,
+    //       name: index.stack.stackName,
+    //       environment: index.stack.environment,
+    //     });
+    //   });
 
-    if (options.showDeps) {
-      depStructure.forEach(instance => {
-        const stackName = instance.stackName;
-        data(stackName);
+    //   data(serializeStructure(long, options.json ?? false));
+    //   return 0;
+    // }
 
-        const depOfStack = instance.dependencies;
-        data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}\n`);
-      });
-    } else {
-      // just print stack IDs
-      stacks.forEach((item) => {
-        data(item.stack.hierarchicalId);
-      });
+    // if (options.showDeps) {
+    //   depStructure.forEach(instance => {
+    //     const stackName = instance.stackName;
+    //     data(stackName);
 
-    }
+    //     const depOfStack = instance.dependencies;
+    //     data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}\n`);
+    //   });
+    // } else {
+    //   // just print stack IDs
+    //   stacks.forEach((item) => {
+    //     data(item.stack.hierarchicalId);
+    //   });
+
+    // }
 
     return 0; // exit-code
-  }
-
-  // TODO: Improve structure here for better access
-  createStackDependencyStructure(items: StackData[]): Result[] {
-    const allResults: Result[] = [];
-    for (const item of items) {
-
-      const stackName = item.stack.manifest.displayName ?? item.stack.id;
-      const result: Result = {
-        stackName: stackName,
-        dependencies: [],
-      };
-
-      for (const dep of item.dependencies) {
-
-        let dependenciesOfDependency: Result[] = [];
-        if (dep.dependencies) {
-          dependenciesOfDependency = this.createStackDependencyStructure(dep.dependencies);
-        }
-
-        result.dependencies.push({
-          stackName: dep.stack.manifest.displayName ?? dep.stack.id,
-          dependencies: dependenciesOfDependency,
-        });
-      }
-
-      allResults.push(result);
-    }
-
-    return allResults;
   }
 
   /**

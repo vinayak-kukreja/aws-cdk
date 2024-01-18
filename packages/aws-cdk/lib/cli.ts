@@ -38,6 +38,8 @@ const yargs = require('yargs');
 /* eslint-disable max-len */
 /* eslint-disable @typescript-eslint/no-shadow */ // yargs
 
+let cdkToolkit: CdkToolkit;
+
 async function parseCommandLineArguments(args: string[]) {
   // Use the following configuration for array arguments:
   //
@@ -471,6 +473,8 @@ export async function exec(args: string[], synthesizer?: Synthesizer): Promise<n
       sdkProvider,
     });
 
+    cdkToolkit = cli;
+
     switch (command) {
       case 'context':
         return context(commandOptions);
@@ -779,6 +783,10 @@ function determineHotswapMode(hotswap?: boolean, hotswapFallback?: boolean, watc
   }
 
   return hotswapMode;
+}
+
+export function getCdkToolkit() {
+  return cdkToolkit;
 }
 
 export function cli(args: string[] = process.argv.slice(2)) {
