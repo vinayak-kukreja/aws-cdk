@@ -2,12 +2,15 @@
 import { Environment } from '@aws-cdk/cx-api';
 import { DefaultSelection, ExtendedStackSelection, StackCollection } from './api/cxapp/cloud-assembly';
 import { CdkToolkit } from './cdk-toolkit';
+import { print } from './logging';
+import { CliOptions, setup } from './workfow-helper';
 
 /**
  * List Workflow Options
  */
 export interface ListWorkflowOptions {
   readonly selectedStacks: string[];
+  readonly cliOptions?: CliOptions;
 }
 
 export type StackDetails = {
@@ -24,7 +27,17 @@ export type StackDetails = {
  * @param options list workflow options
  * @returns list of stack data objects
  */
-export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOptions): Promise<string> {
+// TODO Switch to Promise<string> for doucment and uncomment lines below
+export async function listWorkflow(options: ListWorkflowOptions): Promise<number> {
+
+  let toolkit: CdkToolkit;
+  // Or IDE options
+  if (options.cliOptions) {
+    toolkit = await setup(options.cliOptions);
+  } else {
+    throw new Error('CLI options needs to be defined!');
+  }
+
   const assembly = await toolkit.assembly();
 
   const stacks = await assembly.selectStacks({
@@ -83,7 +96,10 @@ export async function listWorkflow(toolkit: CdkToolkit, options: ListWorkflowOpt
 
   const result = calculateStackDependencies(stacks);
 
-  return JSON.stringify(result);
+  print(JSON.stringify(result, null, 4));
+  // return JSON.stringify(result);
+
+  return 0;
 }
 
 // Serialize to json what is returned here

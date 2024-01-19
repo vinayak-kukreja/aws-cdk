@@ -28,7 +28,6 @@ import { validateSnsTopicArn } from './util/validate-notification-arn';
 import { Concurrency, WorkGraph } from './util/work-graph';
 import { WorkGraphBuilder } from './util/work-graph-builder';
 import { AssetBuildNode, AssetPublishNode, StackNode } from './util/work-graph-types';
-import { listWorkflow } from './workflows';
 import { environmentsFromDescriptors, globEnvironmentsFromStacks, looksLikeGlob } from '../lib/api/cxapp/environments';
 
 export type StackDetails = { id: string; name: string; environment: cxapi.Environment; };
@@ -629,62 +628,62 @@ export class CdkToolkit {
     return 0; // exit-code
   }
 
-  public async newListFunctionality(selectors: string[], options: { long?: boolean, json?: boolean, showDeps?: boolean } = { }): Promise<number> {
-    const stacks = await listWorkflow(this, {
-      selectedStacks: selectors,
-    });
+  // public async newListFunctionality(selectors: string[], options: { long?: boolean, json?: boolean, showDeps?: boolean } = { }): Promise<number> {
+  //   const stacks = await listWorkflow(this, {
+  //     selectedStacks: selectors,
+  //   });
 
-    options;
+  //   options;
 
-    data(stacks);
+  //   data(stacks);
 
-    // data(`${inspect(stacks, {
-    //   depth: 5,
-    // })}\n\n\n\n]`);
+  //   // data(`${inspect(stacks, {
+  //   //   depth: 5,
+  //   // })}\n\n\n\n]`);
 
-    // // data(`Dependency Structure: \n${inspect(depStructure, {
-    // //   depth: 2,
-    // // })}}\n\n\n\n`);
+  //   // // data(`Dependency Structure: \n${inspect(depStructure, {
+  //   // //   depth: 2,
+  //   // // })}}\n\n\n\n`);
 
-    // if (options.long && options.showDeps) {
-    //   throw new Error('You can only specify either list or show-deps flag while listing stacks');
-    // }
+  //   // if (options.long && options.showDeps) {
+  //   //   throw new Error('You can only specify either list or show-deps flag while listing stacks');
+  //   // }
 
-    // // if we are in "long" mode, emit the array as-is (JSON/YAML)
-    // if (options.long) {
-    //   const long: StackDetails[] = [];
+  //   // // if we are in "long" mode, emit the array as-is (JSON/YAML)
+  //   // if (options.long) {
+  //   //   const long: StackDetails[] = [];
 
-    //   stacks.forEach((index) => {
+  //   //   stacks.forEach((index) => {
 
-    //     long.push({
-    //       id: index.stack.hierarchicalId,
-    //       name: index.stack.stackName,
-    //       environment: index.stack.environment,
-    //     });
-    //   });
+  //   //     long.push({
+  //   //       id: index.stack.hierarchicalId,
+  //   //       name: index.stack.stackName,
+  //   //       environment: index.stack.environment,
+  //   //     });
+  //   //   });
 
-    //   data(serializeStructure(long, options.json ?? false));
-    //   return 0;
-    // }
+  //   //   data(serializeStructure(long, options.json ?? false));
+  //   //   return 0;
+  //   // }
 
-    // if (options.showDeps) {
-    //   depStructure.forEach(instance => {
-    //     const stackName = instance.stackName;
-    //     data(stackName);
+  //   // if (options.showDeps) {
+  //   //   depStructure.forEach(instance => {
+  //   //     const stackName = instance.stackName;
+  //   //     data(stackName);
 
-    //     const depOfStack = instance.dependencies;
-    //     data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}\n`);
-    //   });
-    // } else {
-    //   // just print stack IDs
-    //   stacks.forEach((item) => {
-    //     data(item.stack.hierarchicalId);
-    //   });
+  //   //     const depOfStack = instance.dependencies;
+  //   //     data(`Stack Dependencies: ${JSON.stringify(depOfStack, null, 4)}\n`);
+  //   //   });
+  //   // } else {
+  //   //   // just print stack IDs
+  //   //   stacks.forEach((item) => {
+  //   //     data(item.stack.hierarchicalId);
+  //   //   });
 
-    // }
+  //   // }
 
-    return 0; // exit-code
-  }
+  //   return 0; // exit-code
+  // }
 
   /**
    * Synthesize the given set of stacks (called when the user runs 'cdk synth')

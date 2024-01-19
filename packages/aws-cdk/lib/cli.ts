@@ -9,6 +9,7 @@ import { HotswapMode } from './api/hotswap/common';
 import { ILock } from './api/util/rwlock';
 import { checkForPlatformWarnings } from './platform-warnings';
 import { enableTracing } from './util/tracing';
+import { listWorkflow } from './workflows';
 import { SdkProvider } from '../lib/api/aws-auth';
 import { BootstrapSource, Bootstrapper } from '../lib/api/bootstrap';
 import { StackSelector } from '../lib/api/cxapp/cloud-assembly';
@@ -37,8 +38,6 @@ const yargs = require('yargs');
 
 /* eslint-disable max-len */
 /* eslint-disable @typescript-eslint/no-shadow */ // yargs
-
-let cdkToolkit: CdkToolkit;
 
 async function parseCommandLineArguments(args: string[]) {
   // Use the following configuration for array arguments:
@@ -473,8 +472,6 @@ export async function exec(args: string[], synthesizer?: Synthesizer): Promise<n
       sdkProvider,
     });
 
-    cdkToolkit = cli;
-
     switch (command) {
       case 'context':
         return context(commandOptions);
@@ -487,7 +484,17 @@ export async function exec(args: string[], synthesizer?: Synthesizer): Promise<n
 
       case 'ls':
       case 'list':
-        return cli.newListFunctionality(args.STACKS, { long: args.long, json: argv.json, showDeps: args.dependencies });
+        return listWorkflow({
+          selectedStacks: args.STACKS,
+          cliOptions: {
+            configuration: {
+              ...argv,
+              _: argv._ as [Command, ...string[]], // TypeScript at its best
+            },
+            cliArguments: argv,
+            synthesizer: synthesizer,
+          },
+        });
 
       case 'diff':
         const enableDiffNoFail = isFeatureEnabled(configuration, cxapi.ENABLE_DIFF_NO_FAIL_CONTEXT);
@@ -783,10 +790,6 @@ function determineHotswapMode(hotswap?: boolean, hotswapFallback?: boolean, watc
   }
 
   return hotswapMode;
-}
-
-export function getCdkToolkit() {
-  return cdkToolkit;
 }
 
 export function cli(args: string[] = process.argv.slice(2)) {
