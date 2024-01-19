@@ -1,5 +1,6 @@
 import '@jsii/check-node/run';
 import { ILock } from './api/util/rwlock';
+import { CliOptions } from './workflows';
 import { SdkProvider } from '../lib/api/aws-auth';
 import { CloudExecutable } from '../lib/api/cxapp/cloud-executable';
 import { execProgram } from '../lib/api/cxapp/exec';
@@ -8,17 +9,12 @@ import { ToolkitInfo } from '../lib/api/toolkit-info';
 import { CdkToolkit } from '../lib/cdk-toolkit';
 import { Command, Configuration } from '../lib/settings';
 
-export interface CliOptions {
-  // This is for argv
-  cliArguments: { [key: string]: any },
-}
-
 export async function setup(options: CliOptions): Promise<CdkToolkit> {
   // Configuration
   const configuration = new Configuration({
     commandLineArguments: {
-      ...options.cliArguments,
-      _: options.cliArguments._ as [Command, ...string[]], // TypeScript at its best
+      ...options.arguments,
+      _: options.arguments._ as [Command, ...string[]], // TypeScript at its best
     },
   });
   await configuration.load();
@@ -26,10 +22,10 @@ export async function setup(options: CliOptions): Promise<CdkToolkit> {
   // SDKProvider
   const sdkProvider = await SdkProvider.withAwsCliCompatibleDefaults({
     profile: configuration.settings.get(['profile']),
-    ec2creds: options.cliArguments.ec2creds,
+    ec2creds: options.arguments.ec2creds,
     httpOptions: {
-      proxyAddress: options.cliArguments.ec2creds,
-      caBundlePath: options.cliArguments.ec2creds ? options.cliArguments.ec2creds['ca-bundle-path'] : undefined,
+      proxyAddress: options.arguments.ec2creds,
+      caBundlePath: options.arguments.ec2creds ? options.arguments.ec2creds['ca-bundle-path'] : undefined,
     },
   });
 
@@ -58,9 +54,9 @@ export async function setup(options: CliOptions): Promise<CdkToolkit> {
   const toolkit = new CdkToolkit({
     cloudExecutable,
     deployments: cloudFormation,
-    verbose: options.cliArguments.trace || options.cliArguments.verbose > 0,
-    ignoreErrors: options.cliArguments['ignore-errors'],
-    strict: options.cliArguments.strict,
+    verbose: options.arguments.trace || options.arguments.verbose > 0,
+    ignoreErrors: options.arguments['ignore-errors'],
+    strict: options.arguments.strict,
     configuration,
     sdkProvider,
   });

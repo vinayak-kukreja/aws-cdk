@@ -3,13 +3,14 @@ import { Environment } from '@aws-cdk/cx-api';
 import { DefaultSelection, ExtendedStackSelection, StackCollection } from './api/cxapp/cloud-assembly';
 import { CdkToolkit } from './cdk-toolkit';
 import { print } from './logging';
-import { CliOptions, setup } from './workfow-helper';
+import { setup } from './workfow-helper';
 
-/**
- * List Workflow Options
- */
+export interface CliOptions {
+  arguments: { [key: string]: any },
+}
+
 export interface ListWorkflowOptions {
-  readonly selectedStacks: string[];
+  readonly selector: string[];
   readonly cliOptions?: CliOptions;
 }
 
@@ -20,13 +21,6 @@ export type StackDetails = {
   dependencies: StackDetails[];
 };
 
-/**
- * List Workflow
- *
- * @param toolkit a cdk toolkit instance
- * @param options list workflow options
- * @returns list of stack data objects
- */
 // TODO Switch to Promise<string> for doucment and uncomment lines below
 export async function listWorkflow(options: ListWorkflowOptions): Promise<number> {
 
@@ -41,13 +35,13 @@ export async function listWorkflow(options: ListWorkflowOptions): Promise<number
   const assembly = await toolkit.assembly();
 
   const stacks = await assembly.selectStacks({
-    patterns: options.selectedStacks,
+    patterns: options.selector,
   }, {
     extend: ExtendedStackSelection.Upstream,
     defaultBehavior: DefaultSelection.AllStacks,
   });
 
-  toolkit.validateStacksSelected(stacks, options.selectedStacks);
+  toolkit.validateStacksSelected(stacks, options.selector);
   toolkit.validateStacks(stacks);
 
   function calculateStackDependencies(collectionOfStacks: StackCollection): StackDetails[] {

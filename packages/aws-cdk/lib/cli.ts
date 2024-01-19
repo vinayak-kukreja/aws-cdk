@@ -486,9 +486,9 @@ export async function exec(args: string[], synthesizer?: Synthesizer): Promise<n
       case 'ls':
       case 'list':
         return listWorkflow({
-          selectedStacks: args.STACKS,
+          selector: args.STACKS,
           cliOptions: {
-            cliArguments: argv,
+            arguments: argv,
           },
         });
 
