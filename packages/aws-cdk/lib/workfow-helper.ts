@@ -1,25 +1,25 @@
 import '@jsii/check-node/run';
 import { ILock } from './api/util/rwlock';
 import { SdkProvider } from '../lib/api/aws-auth';
-import { CloudExecutable, Synthesizer } from '../lib/api/cxapp/cloud-executable';
+import { CloudExecutable } from '../lib/api/cxapp/cloud-executable';
 import { execProgram } from '../lib/api/cxapp/exec';
 import { Deployments } from '../lib/api/deployments';
 import { ToolkitInfo } from '../lib/api/toolkit-info';
 import { CdkToolkit } from '../lib/cdk-toolkit';
-import { Arguments, Configuration } from '../lib/settings';
+import { Command, Configuration } from '../lib/settings';
 
 export interface CliOptions {
-  configuration: Arguments | undefined;
-  // TODO Can this be better?
+  // This is for argv
   cliArguments: { [key: string]: any },
-  // TODO Need to change this from a class to what arguments are needed to initialize
-  synthesizer: Synthesizer | undefined;
 }
 
 export async function setup(options: CliOptions): Promise<CdkToolkit> {
   // Configuration
   const configuration = new Configuration({
-    commandLineArguments: options.configuration,
+    commandLineArguments: {
+      ...options.cliArguments,
+      _: options.cliArguments._ as [Command, ...string[]], // TypeScript at its best
+    },
   });
   await configuration.load();
 
@@ -28,7 +28,6 @@ export async function setup(options: CliOptions): Promise<CdkToolkit> {
     profile: configuration.settings.get(['profile']),
     ec2creds: options.cliArguments.ec2creds,
     httpOptions: {
-      // Replacement for other argv arguments
       proxyAddress: options.cliArguments.ec2creds,
       caBundlePath: options.cliArguments.ec2creds ? options.cliArguments.ec2creds['ca-bundle-path'] : undefined,
     },
@@ -39,7 +38,8 @@ export async function setup(options: CliOptions): Promise<CdkToolkit> {
   const cloudExecutable = new CloudExecutable({
     configuration,
     sdkProvider,
-    synthesizer: options.synthesizer ?? (async (aws, config) => {
+    // options.synthesizer in cli.ts. Do not see it being used in any reference, dead code?
+    synthesizer: (async (aws, config) => {
       // Invoke 'execProgram', and copy the lock for the directory in the global
       // variable here. It will be released when the CLI exits. Locks are not re-entrant
       // so release it if we have to synthesize more than once (because of context lookups).

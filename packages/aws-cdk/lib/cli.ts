@@ -487,12 +487,7 @@ export async function exec(args: string[], synthesizer?: Synthesizer): Promise<n
         return listWorkflow({
           selectedStacks: args.STACKS,
           cliOptions: {
-            configuration: {
-              ...argv,
-              _: argv._ as [Command, ...string[]], // TypeScript at its best
-            },
             cliArguments: argv,
-            synthesizer: synthesizer,
           },
         });
 
