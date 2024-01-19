@@ -101,5 +101,3 @@ export async function listWorkflow(options: ListWorkflowOptions): Promise<number
 
   return 0;
 }
-
-// Serialize to json what is returned here
