@@ -14,11 +14,16 @@ export interface ListWorkflowOptions {
   readonly cliOptions?: CliOptions;
 }
 
+export type DependencyDetails = {
+  id: string;
+  dependencies: DependencyDetails[];
+};
+
 export type StackDetails = {
   id: string;
   name: string;
   environment: Environment;
-  dependencies: StackDetails[];
+  dependencies: DependencyDetails[];
 };
 
 // TODO Switch to Promise<string> for doucment and uncomment lines below
@@ -71,12 +76,15 @@ export async function listWorkflow(options: ListWorkflowOptions): Promise<number
 
           const stackWithDeps = calculateStackDependencies(depStack);
 
-          data.dependencies?.push(...stackWithDeps);
+          for (const stackDetail of stackWithDeps) {
+            data.dependencies.push({
+              id: stackDetail.id,
+              dependencies: stackDetail.dependencies,
+            });
+          }
         } else {
           data.dependencies?.push({
             id: depStack.stackArtifacts[0].id,
-            name: depStack.stackArtifacts[0].stackName,
-            environment: depStack.stackArtifacts[0].environment,
             dependencies: [],
           });
         }
