@@ -9,7 +9,7 @@ import { HotswapMode } from './api/hotswap/common';
 import { ILock } from './api/util/rwlock';
 import { checkForPlatformWarnings } from './platform-warnings';
 import { enableTracing } from './util/tracing';
-import { listWorkflow } from './workflows';
+import { init, listWorkflow } from './workflows';
 import { SdkProvider } from '../lib/api/aws-auth';
 import { BootstrapSource, Bootstrapper } from '../lib/api/bootstrap';
 import { StackSelector } from '../lib/api/cxapp/cloud-assembly';
@@ -485,11 +485,11 @@ export async function exec(args: string[], synthesizer?: Synthesizer): Promise<n
 
       case 'ls':
       case 'list':
+        await init({
+          arguments: argv,
+        });
         return listWorkflow({
           selector: args.STACKS,
-          cliOptions: {
-            arguments: argv,
-          },
         });
 
       case 'diff':

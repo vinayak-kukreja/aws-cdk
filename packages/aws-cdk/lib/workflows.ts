@@ -3,15 +3,15 @@ import { Environment } from '@aws-cdk/cx-api';
 import { DefaultSelection, ExtendedStackSelection, StackCollection } from './api/cxapp/cloud-assembly';
 import { CdkToolkit } from './cdk-toolkit';
 import { print } from './logging';
-import { setup } from './workfow-helper';
+import { InitOptions, init as initialization } from './workfow-helper';
 
-export interface CliOptions {
-  arguments: { [key: string]: any },
+let toolkit: CdkToolkit;
+
+export async function init(options: InitOptions) {
+  toolkit = await initialization(options);
 }
-
 export interface ListWorkflowOptions {
   readonly selector: string[];
-  readonly cliOptions?: CliOptions;
 }
 
 export type DependencyDetails = {
@@ -28,15 +28,6 @@ export type StackDetails = {
 
 // TODO Switch to Promise<string> for doucment and uncomment lines below
 export async function listWorkflow(options: ListWorkflowOptions): Promise<number> {
-
-  let toolkit: CdkToolkit;
-  // Or IDE options
-  if (options.cliOptions) {
-    toolkit = await setup(options.cliOptions);
-  } else {
-    throw new Error('CLI options needs to be defined!');
-  }
-
   const assembly = await toolkit.assembly();
 
   const stacks = await assembly.selectStacks({
